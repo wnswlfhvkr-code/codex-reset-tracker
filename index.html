@@ -1,0 +1,239 @@
+<title>Codex 리셋 트래커</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 상단 요약 → 월별 막대 + 사유 분류 → 날짜별 표(필터 가능). 리셋은 청록, 적립은 주황으로 구분 */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#14212b; --muted:#5d6b77; --line:#dbe2e8;
+  --reset:#0f7c8a; --both:#5b4fc4; --bank:#d9822b;
+  --font-body:"Noto Sans KR",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f171d; --surface:#17222a; --ink:#e6edf2; --muted:#8fa0ad; --line:#26343e;
+  --reset:#3fb6c4; --both:#8f85f0; --bank:#f0a152; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171d; --surface:#17222a; --ink:#e6edf2; --muted:#8fa0ad; --line:#26343e;
+  --reset:#3fb6c4; --both:#8f85f0; --bank:#f0a152; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.55;
+  padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:26px;line-height:1.25;margin:0;text-wrap:balance}
+h2{font-size:15px;margin:0 0 12px}
+.sub{color:var(--muted);margin:6px 0 0;max-width:68ch}
+.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.kpi b{display:block;font-family:var(--font-data);font-size:26px;font-weight:500;line-height:1.2}
+.kpi span{color:var(--muted);font-size:12px}
+.two{display:grid;grid-template-columns:3fr 2fr;gap:20px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+svg text{fill:var(--muted);font-family:var(--font-data);font-size:10px}
+.cat{display:grid;grid-template-columns:96px 1fr 28px;align-items:center;gap:8px;margin-bottom:7px;font-size:13px}
+.cat .bar{height:10px;background:var(--bg);border-radius:2px;overflow:hidden}
+.cat .bar div{height:100%;background:var(--reset)}
+.cat .num{text-align:right}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0}
+input{flex:1;min-width:160px}
+:focus-visible{outline:2px solid var(--reset);outline-offset:1px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:620px}
+th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:500}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.c{text-align:right;width:64px}
+.ev{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.ev+.ev{margin-top:5px}
+.pill{font-size:11px;padding:1px 7px;border-radius:10px;color:#fff;white-space:nowrap}
+.p-reset{background:var(--reset)}.p-reset\+banked{background:var(--both)}.p-banked{background:var(--bank)}.p-mention{background:var(--muted)}
+.banner{border:1px solid var(--bank);border-radius:6px;padding:10px 14px;font-size:13px;background:var(--surface)}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}.chk input{flex:none;min-width:0}
+.t{color:var(--muted);font-family:var(--font-data);font-size:12px}
+.ev a{color:var(--muted);font-size:12px}
+.note{color:var(--muted);font-size:12px;max-width:80ch}
+.zero{color:var(--line)}
+h3{font-size:13px;margin:0 0 8px}
+.rules{margin:14px 0 8px;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:80ch}
+.dow-row{display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:8px;margin-bottom:5px;font-size:13px}
+.dow-row .bar{height:10px;background:var(--bg);border-radius:2px;overflow:hidden}
+.dow-row .bar div{height:100%;background:var(--reset)}
+.cal-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cal-head h2{margin:0;flex:1;min-width:120px}
+button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--reset)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .dow{font-size:11px;color:var(--muted);text-align:center;padding:2px 0}
+.cell{min-height:64px;border:1px solid var(--line);border-radius:4px;padding:4px 5px;background:var(--bg);display:flex;flex-direction:column;gap:2px;text-align:left;font-size:11px;color:var(--ink);min-width:0}
+.cell.blank{border-color:transparent;background:none;cursor:default}
+.cell .dn{font-family:var(--font-data);color:var(--muted)}
+.cell .tot{font-family:var(--font-data);color:var(--muted)}
+.cell .rs{font-family:var(--font-data);font-weight:500;color:#fff;background:var(--reset);border-radius:8px;padding:0 6px;align-self:flex-start}
+.cell.has{background:var(--surface)}
+.cell.sel{outline:2px solid var(--ink);outline-offset:-1px}
+.cell.empty{opacity:.45}
+#caldetail{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+tr.day{cursor:pointer}
+tr.day:hover td{background:var(--bg)}
+tr.day td:first-child::before{content:"\25B8";display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+tr.day.open td:first-child::before{transform:rotate(90deg)}
+tr.det td{background:var(--bg)}
+tr.det[hidden]{display:none}
+.hint{color:var(--muted);font-size:12px}
+.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin-top:12px}
+.pager button[aria-current="page"]{background:var(--reset);border-color:var(--reset);color:#fff}
+.pager button:disabled{opacity:.4;cursor:default}
+@media(max-width:520px){.cell{min-height:52px;padding:3px}.cell .tot{display:none}}
+</style>
+<main>
+  <header>
+    <h1>Codex 리셋 트래커</h1>
+    <p class="sub">OpenAI Codex 책임자 티보(Thibault Sottiaux, @thsottiaux)의 X 트윗을 날짜별로 집계했습니다. 전체 트윗 수, 그중 리셋 관련 트윗 수, 리셋 정보를 함께 보여 줍니다.</p>
+  </header>
+  <div class="banner" id="banner"></div>
+  <section class="kpis" id="kpis" aria-label="요약"></section>
+  <section class="two">
+    <div class="panel"><h2>월별 전체 트윗과 리셋 관련 트윗</h2>
+      <div class="legend"><span><i style="background:var(--line)"></i>그 외 트윗</span><span><i style="background:var(--reset)"></i>리셋 관련</span></div>
+      <div id="chart"></div>
+      <p class="note">2026-06-28 이전은 답글이 빠져 있어 전체 트윗 수가 실제보다 적습니다.</p></div>
+    <div class="panel"><h2>리셋 관련 트윗의 사유 분류</h2><div id="cats"></div></div>
+  </section>
+  <section class="panel" id="rules">
+    <h2>데이터로 찾은 리셋 규칙</h2>
+    <p class="note">공식 리셋 트윗(트윗 링크가 있는 <span id="rn"></span>건) 기준입니다. 요일·시각에는 규칙이 없고, 사건이 생기면 리셋하는 방식이며 그 빈도가 계속 늘었습니다.</p>
+    <div class="two" style="margin-top:12px">
+      <div><h3>1. 리셋 간격이 짧아졌습니다</h3><div class="tbl"><table style="min-width:0"><thead><tr><th>시기</th><th class="c">횟수</th><th class="c">평균 간격</th></tr></thead><tbody id="era"></tbody></table></div>
+        <p class="note" id="gapnote"></p></div>
+      <div><h3>2. 요일은 고르게 퍼져 있습니다 (미국 태평양시)</h3><div id="dow"></div></div>
+    </div>
+    <ol class="rules">
+      <li><b>사건이 일어나면 리셋합니다.</b> 사유는 장애·사용량 문제 보상, 출시·기념, 사용자 수 돌파, 사유 미공개로 나뉩니다. 장애가 복구되면 같은 날 바로 리셋했습니다(2025-11-05, 2026-03-03, 04-20, 07-25, 09-26).</li>
+      <li><b>사용자 100만 명마다 리셋을 약속했습니다.</b> 티보가 2026-08-12 트윗에서 직접 밝혔고, 7M·8M·9M·10M은 9일 사이에, 이후 15M·20M·25M·40M에도 이어졌습니다.</li>
+      <li><b>먼저 예고하고 지킵니다.</b> "400만 달성, 몇 시간 내 리셋"(04-21), "500만, 내일 아침"(05-31), "24시간 내"(06-16), "화요일에 약속"(09-22)이 그 예입니다.</li>
+      <li><b>2026-06-18부터 적립 리셋이 생겼습니다.</b> 지금 쓰지 않고 쌓아 두는 방식이고, 주로 사용자 수 돌파나 Astra 접근 지연 보상에 쓰였습니다.</li>
+      <li><b>10월 4일부터 28일 스프린트가 규칙입니다.</b> 매일 개선 하나를 내놓지 못하면 전체 리셋입니다. 10월 4~20일 17일 중 6일에 리셋이 나왔고, 스프린트는 11월 1일 직전에 끝납니다.</li>
+    </ol>
+    <p class="note">한계: 약 25%는 사유를 밝히지 않아 이 규칙으로 설명되지 않습니다. 사유 분류는 영문 키워드로 나눈 것이라 경계 사례는 달라질 수 있습니다.</p>
+  </section>
+  <section class="panel">
+    <div class="cal-head"><h2 id="caltitle">달력</h2>
+      <button id="calprev" aria-label="이전 달">&lt;</button><select id="calsel" aria-label="월 선택"></select><button id="calnext" aria-label="다음 달">&gt;</button></div>
+    <p class="hint">칸 아래 숫자는 전체 트윗, 청록 배지는 리셋 관련 트윗 수입니다. 날짜를 누르면 리셋 정보가 아래에 나옵니다.</p>
+    <div class="cal" id="cal"></div>
+    <div id="caldetail"></div>
+  </section>
+  <section class="panel">
+    <h2>날짜별 정리</h2>
+    <div class="filters">
+      <select id="fkind" aria-label="구분"><option value="">공식 리셋 + 언급</option><option value="official">공식 리셋만</option><option value="mention">리셋 언급만</option></select>
+      <input id="fq" type="search" placeholder="날짜·내용 검색 (예: 2026-07, GPT)" aria-label="검색">
+      <label class="chk"><input id="fall" type="checkbox">리셋 관련 없는 날도 보기</label>
+      <button id="expall" type="button">모두 펼치기</button>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>날짜(UTC)</th><th class="c">전체 트윗</th><th class="c">리셋 관련</th><th class="c">공식</th><th class="c">언급</th><th>리셋 정보 (날짜를 누르면 펼침)</th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+    <div class="pager" id="pager"></div>
+    <p class="note" id="count"></p>
+  </section>
+  <p class="note">수집 방법: X의 @thsottiaux 프로필 타임라인을 스크롤해 수집했습니다. 게시물 탭은 2025-08-17(계정 시작)부터 전부 모았지만, 답글은 요청 제한으로 2026-06-28 이후만 모았습니다. 프로필 표시 게시물 수 3,372건 중 1,741건을 집계했습니다. 공식 리셋은 opentherank.com 트래커 목록(63건, 2026-09-29 적립 건은 트윗 링크가 없어 제외)과 트윗 ID로 맞췄고, 리셋 언급은 본문에 reset·재설정·초기화·리셋이 들어간 그 외 트윗입니다. 리셋 언급에는 예고, 농담, 투표, 답글이 섞여 있습니다. 트윗 내용은 X가 한국어로 번역해 보여 준 문장을 줄여 옮겼습니다.</p>
+</main>
+<script>
+const D={"daily": [["2025-08-17", 1], ["2025-08-20", 1], ["2025-08-21", 1], ["2025-08-22", 1], ["2025-08-23", 1], ["2025-08-24", 2], ["2025-08-25", 1], ["2025-08-27", 3], ["2025-08-29", 1], ["2025-09-02", 1], ["2025-09-03", 1], ["2025-09-07", 1], ["2025-09-10", 2], ["2025-09-15", 2], ["2025-09-16", 2], ["2025-09-17", 2], ["2025-09-18", 1], ["2025-09-19", 1], ["2025-09-21", 1], ["2025-09-22", 1], ["2025-09-23", 1], ["2025-09-25", 2], ["2025-10-03", 5], ["2025-10-07", 1], ["2025-10-08", 1], ["2025-10-10", 1], ["2025-10-15", 2], ["2025-10-16", 1], ["2025-10-18", 2], ["2025-10-20", 1], ["2025-10-21", 2], ["2025-10-22", 2], ["2025-10-24", 3], ["2025-10-26", 3], ["2025-10-29", 2], ["2025-10-30", 4], ["2025-10-31", 1], ["2025-11-01", 2], ["2025-11-04", 1], ["2025-11-05", 2], ["2025-11-07", 4], ["2025-11-08", 3], ["2025-11-11", 1], ["2025-11-13", 2], ["2025-11-15", 1], ["2025-11-16", 1], ["2025-11-19", 8], ["2025-11-21", 3], ["2025-11-22", 6], ["2025-11-25", 2], ["2025-11-26", 2], ["2025-12-02", 3], ["2025-12-04", 1], ["2025-12-06", 1], ["2025-12-11", 1], ["2025-12-12", 1], ["2025-12-13", 3], ["2025-12-14", 2], ["2025-12-16", 1], ["2025-12-17", 1], ["2025-12-18", 4], ["2025-12-19", 2], ["2025-12-25", 4], ["2025-12-27", 2], ["2025-12-28", 2], ["2025-12-29", 2], ["2025-12-30", 2], ["2026-01-01", 2], ["2026-01-02", 2], ["2026-01-03", 1], ["2026-01-06", 1], ["2026-01-08", 1], ["2026-01-09", 3], ["2026-01-10", 2], ["2026-01-14", 1], ["2026-01-15", 1], ["2026-01-16", 3], ["2026-01-17", 1], ["2026-01-21", 1], ["2026-01-22", 1], ["2026-01-23", 3], ["2026-01-28", 1], ["2026-01-31", 2], ["2026-02-02", 3], ["2026-02-03", 1], ["2026-02-04", 1], ["2026-02-05", 7], ["2026-02-06", 2], ["2026-02-07", 2], ["2026-02-08", 1], ["2026-02-09", 4], ["2026-02-10", 1], ["2026-02-11", 1], ["2026-02-12", 6], ["2026-02-13", 1], ["2026-02-14", 1], ["2026-02-15", 3], ["2026-02-17", 1], ["2026-02-18", 1], ["2026-02-19", 2], ["2026-02-20", 3], ["2026-02-21", 2], ["2026-02-22", 1], ["2026-02-24", 2], ["2026-02-25", 1], ["2026-02-26", 3], ["2026-02-27", 2], ["2026-02-28", 3], ["2026-03-01", 1], ["2026-03-02", 3], ["2026-03-03", 5], ["2026-03-04", 6], ["2026-03-05", 3], ["2026-03-06", 5], ["2026-03-07", 3], ["2026-03-08", 3], ["2026-03-09", 1], ["2026-03-10", 2], ["2026-03-11", 4], ["2026-03-12", 4], ["2026-03-13", 2], ["2026-03-15", 2], ["2026-03-16", 1], ["2026-03-17", 1], ["2026-03-18", 1], ["2026-03-19", 1], ["2026-03-20", 4], ["2026-03-21", 1], ["2026-03-22", 1], ["2026-03-23", 1], ["2026-03-26", 4], ["2026-03-27", 3], ["2026-03-28", 1], ["2026-03-30", 1], ["2026-04-01", 4], ["2026-04-02", 1], ["2026-04-03", 4], ["2026-04-04", 1], ["2026-04-05", 1], ["2026-04-06", 2], ["2026-04-07", 1], ["2026-04-08", 1], ["2026-04-09", 4], ["2026-04-13", 1], ["2026-04-16", 5], ["2026-04-17", 1], ["2026-04-18", 3], ["2026-04-19", 1], ["2026-04-20", 4], ["2026-04-21", 3], ["2026-04-22", 1], ["2026-04-23", 7], ["2026-04-25", 4], ["2026-04-26", 1], ["2026-04-27", 2], ["2026-04-28", 4], ["2026-04-29", 1], ["2026-04-30", 8], ["2026-05-01", 3], ["2026-05-02", 1], ["2026-05-03", 3], ["2026-05-06", 2], ["2026-05-07", 2], ["2026-05-08", 4], ["2026-05-09", 1], ["2026-05-12", 5], ["2026-05-13", 3], ["2026-05-14", 3], ["2026-05-15", 3], ["2026-05-16", 5], ["2026-05-17", 5], ["2026-05-18", 4], ["2026-05-19", 1], ["2026-05-20", 2], ["2026-05-21", 2], ["2026-05-22", 1], ["2026-05-23", 6], ["2026-05-24", 1], ["2026-05-25", 2], ["2026-05-26", 1], ["2026-05-27", 4], ["2026-05-28", 1], ["2026-05-29", 2], ["2026-05-30", 5], ["2026-05-31", 3], ["2026-06-01", 1], ["2026-06-02", 3], ["2026-06-03", 3], ["2026-06-04", 2], ["2026-06-05", 4], ["2026-06-07", 1], ["2026-06-09", 5], ["2026-06-10", 1], ["2026-06-11", 4], ["2026-06-12", 1], ["2026-06-14", 1], ["2026-06-16", 2], ["2026-06-17", 2], ["2026-06-18", 1], ["2026-06-19", 2], ["2026-06-20", 2], ["2026-06-21", 4], ["2026-06-22", 1], ["2026-06-23", 1], ["2026-06-24", 4], ["2026-06-25", 1], ["2026-06-26", 4], ["2026-06-27", 1], ["2026-06-28", 12], ["2026-06-29", 6], ["2026-06-30", 2], ["2026-07-01", 4], ["2026-07-02", 2], ["2026-07-03", 5], ["2026-07-04", 12], ["2026-07-05", 2], ["2026-07-06", 6], ["2026-07-08", 5], ["2026-07-09", 28], ["2026-07-10", 13], ["2026-07-11", 18], ["2026-07-12", 27], ["2026-07-13", 11], ["2026-07-14", 5], ["2026-07-15", 16], ["2026-07-16", 18], ["2026-07-17", 18], ["2026-07-18", 26], ["2026-07-19", 26], ["2026-07-20", 6], ["2026-07-21", 4], ["2026-07-22", 5], ["2026-07-23", 15], ["2026-07-24", 13], ["2026-07-25", 30], ["2026-07-26", 17], ["2026-07-27", 22], ["2026-07-28", 9], ["2026-07-29", 10], ["2026-07-30", 25], ["2026-07-31", 19], ["2026-08-01", 20], ["2026-08-02", 4], ["2026-08-03", 1], ["2026-08-04", 8], ["2026-08-05", 7], ["2026-08-06", 8], ["2026-08-07", 5], ["2026-08-08", 15], ["2026-08-09", 4], ["2026-08-10", 2], ["2026-08-11", 8], ["2026-08-12", 11], ["2026-08-13", 9], ["2026-08-14", 3], ["2026-08-15", 15], ["2026-08-16", 23], ["2026-08-17", 16], ["2026-08-18", 1], ["2026-08-19", 12], ["2026-08-20", 5], ["2026-08-21", 10], ["2026-08-22", 16], ["2026-08-23", 10], ["2026-08-24", 10], ["2026-08-25", 17], ["2026-08-26", 10], ["2026-08-27", 13], ["2026-08-28", 15], ["2026-08-29", 14], ["2026-08-30", 8], ["2026-08-31", 6], ["2026-09-01", 7], ["2026-09-02", 7], ["2026-09-03", 24], ["2026-09-04", 12], ["2026-09-05", 15], ["2026-09-06", 14], ["2026-09-07", 10], ["2026-09-08", 9], ["2026-09-09", 11], ["2026-09-10", 12], ["2026-09-11", 7], ["2026-09-12", 9], ["2026-09-13", 1], ["2026-09-14", 4], ["2026-09-15", 11], ["2026-09-16", 5], ["2026-09-17", 7], ["2026-09-18", 5], ["2026-09-19", 15], ["2026-09-20", 3], ["2026-09-21", 1], ["2026-09-22", 13], ["2026-09-23", 3], ["2026-09-24", 2], ["2026-09-25", 3], ["2026-09-26", 8], ["2026-09-27", 6], ["2026-09-28", 7], ["2026-09-29", 28], ["2026-09-30", 34], ["2026-10-01", 13], ["2026-10-02", 8], ["2026-10-03", 15], ["2026-10-04", 18], ["2026-10-05", 10], ["2026-10-06", 40], ["2026-10-07", 12], ["2026-10-08", 13], ["2026-10-09", 6], ["2026-10-10", 10], ["2026-10-11", 10], ["2026-10-12", 5], ["2026-10-13", 14], ["2026-10-14", 2], ["2026-10-15", 13], ["2026-10-16", 8], ["2026-10-17", 21], ["2026-10-18", 7], ["2026-10-19", 9], ["2026-10-20", 3], ["2026-10-21", 1]], "events": [{"d": "2025-09-17", "t": "04:02", "kind": "official", "type": "reset", "ko": "GPU 증설 중 속도 저하 보상", "cat": "장애·지연", "id": "1968163721034994139"}, {"d": "2025-09-25", "t": "19:39", "kind": "mention", "type": "mention", "ko": "Codex CLI 0.41.0: /status 로 한도 리셋 시점 확인 (릴리스 안내)", "cat": "기타 언급", "id": "1971298655161417937", "rep": 0}, {"d": "2025-11-05", "t": "20:19", "kind": "official", "type": "reset", "ko": "전 세계 장애 보상", "cat": "장애·지연", "id": "1986166501435711936"}, {"d": "2025-11-22", "t": "23:13", "kind": "official", "type": "reset", "ko": "높은 지연시간 보상", "cat": "장애·지연", "id": "1992370994028388670"}, {"d": "2025-12-02", "t": "22:49", "kind": "official", "type": "reset", "ko": "문제를 빠르게 완화하기 위해", "cat": "장애·지연", "id": "1995988609896513743"}, {"d": "2025-12-17", "t": "02:18", "kind": "official", "type": "reset", "ko": "장애 이후 전체 초기화", "cat": "장애·지연", "id": "2001114683047317723"}, {"d": "2025-12-19", "t": "22:01", "kind": "official", "type": "reset", "ko": "사용량 집계·과금 시스템 재작성", "cat": "시스템 변경", "id": "2002137269134819610"}, {"d": "2025-12-25", "t": "08:01", "kind": "official", "type": "reset", "ko": "연말 선물 (1/1까지 한도 2배)", "cat": "이벤트·선물", "id": "2004100061933064395"}, {"d": "2026-03-03", "t": "01:50", "kind": "official", "type": "reset", "ko": "요청 차단 사고 보상", "cat": "장애·지연", "id": "2028649088594436225"}, {"d": "2026-03-04", "t": "21:30", "kind": "official", "type": "reset", "ko": "2배 프로모션 누락 보상", "cat": "장애·지연", "id": "2029308599835738218"}, {"d": "2026-03-08", "t": "02:42", "kind": "official", "type": "reset", "ko": "사용량이 예상보다 빨리 줄어든다는 제보", "cat": "사용량 조사", "id": "2030474136024400173"}, {"d": "2026-03-10", "t": "03:51", "kind": "official", "type": "reset", "ko": "문제 해결 후", "cat": "장애·지연", "id": "2031216405266481489"}, {"d": "2026-03-11", "t": "05:38", "kind": "official", "type": "reset", "ko": "Codex 안정화", "cat": "장애·지연", "id": "2031605592352313567"}, {"d": "2026-03-12", "t": "04:10", "kind": "mention", "type": "mention", "ko": "hascodexratelimitreset.today 사이트를 만든 사람 칭찬", "cat": "기타 언급", "id": "2031945891528200505", "rep": 0}, {"d": "2026-03-27", "t": "01:52", "kind": "official", "type": "reset", "ko": "플러그인 출시", "cat": "출시·기념", "id": "2037346989244096581"}, {"d": "2026-04-01", "t": "07:48", "kind": "official", "type": "reset", "ko": "한도 도달 증가", "cat": "사용량 조사", "id": "2039248564967424483"}, {"d": "2026-04-07", "t": "23:13", "kind": "official", "type": "reset", "ko": "주간 사용자 300만", "cat": "사용자 수 돌파", "id": "2041655710346572085"}, {"d": "2026-04-09", "t": "02:31", "kind": "mention", "type": "mention", "ko": "어제 리셋 타이밍이 아쉬웠다, 3M 축하로 내일 다시 리셋하겠다 예고", "cat": "리셋 예고", "id": "2042067902392942790", "rep": 0}, {"d": "2026-04-09", "t": "17:51", "kind": "official", "type": "reset", "ko": "100달러 요금제 출시", "cat": "출시·기념", "id": "2042299371602264319"}, {"d": "2026-04-09", "t": "19:33", "kind": "mention", "type": "mention", "ko": "성장 속도면 2주 안에 또 리셋해야 할 것 (예고성 농담)", "cat": "리셋 예고", "id": "2042325164902531427", "rep": 0}, {"d": "2026-04-17", "t": "00:58", "kind": "official", "type": "reset", "ko": "Codex 1주년", "cat": "출시·기념", "id": "2044943514832871564"}, {"d": "2026-04-20", "t": "23:15", "kind": "official", "type": "reset", "ko": "약 10분 장애 후", "cat": "장애·지연", "id": "2046367145588916687"}, {"d": "2026-04-21", "t": "14:52", "kind": "mention", "type": "mention", "ko": "활성 사용자 400만 기념, 몇 시간 내 다시 리셋 예고", "cat": "리셋 예고", "id": "2046602907077038501", "rep": 0}, {"d": "2026-04-28", "t": "05:28", "kind": "official", "type": "reset", "ko": "GPT-5.5 출시", "cat": "출시·기념", "id": "2048997818673537399"}, {"d": "2026-05-16", "t": "17:51", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2055707616605835333"}, {"d": "2026-05-23", "t": "20:14", "kind": "official", "type": "reset", "ko": "캐시 관련 회귀 롤백 후", "cat": "장애·지연", "id": "2058280452851638313"}, {"d": "2026-05-31", "t": "05:59", "kind": "mention", "type": "mention", "ko": "사용자 500만 축하로 내일 아침 한도 재설정 예고", "cat": "리셋 예고", "id": "2060964284117782996", "rep": 0}, {"d": "2026-05-31", "t": "15:25", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2061106703446450392"}, {"d": "2026-06-04", "t": "00:25", "kind": "official", "type": "reset", "ko": "24시간 내 안정성 사고 3건", "cat": "장애·지연", "id": "2062329981548802523"}, {"d": "2026-06-12", "t": "16:17", "kind": "mention", "type": "mention", "ko": "경고 없이 초기화돼 짜증난다는 피드백, 다음엔 적용 시점 선택 가능", "cat": "리셋 안내", "id": "2065468501750649006", "rep": 0}, {"d": "2026-06-16", "t": "18:49", "kind": "mention", "type": "mention", "ko": "고쳐졌다, 24시간 안에 리셋할 것이라고 예고", "cat": "리셋 예고", "id": "2066956441173323943", "rep": 0}, {"d": "2026-06-18", "t": "00:10", "kind": "official", "type": "reset+banked", "ko": "더블 리셋 기념", "cat": "이벤트·선물", "id": "2067399435009622521"}, {"d": "2026-06-21", "t": "20:23", "kind": "mention", "type": "mention", "ko": "리셋을 은행처럼 쌓아둘 수 있게 됨 (적립 리셋 소개)", "cat": "리셋 안내", "id": "2068792010715324444", "rep": 0}, {"d": "2026-06-26", "t": "23:39", "kind": "official", "type": "reset", "ko": "사용량 조사 중 호의성 초기화", "cat": "사용량 조사", "id": "2070653282440405046"}, {"d": "2026-06-28", "t": "20:27", "kind": "mention", "type": "mention", "ko": "프로→플러스 다운그레이드는 리셋되지 않는다는 설명", "cat": "기타 언급", "id": "2071329580829319493", "rep": 1}, {"d": "2026-06-28", "t": "23:54", "kind": "official", "type": "reset", "ko": "조사 중 전체 하드 리셋", "cat": "사용량 조사", "id": "2071381664853319742"}, {"d": "2026-06-29", "t": "00:01", "kind": "mention", "type": "mention", "ko": "이전 리셋을 이미 썼어도 조사 후 수동 리셋을 더 받는다", "cat": "기타 언급", "id": "2071383430634344902", "rep": 0}, {"d": "2026-06-29", "t": "21:42", "kind": "mention", "type": "mention", "ko": "리셋 버튼이 있다고 생각해? (인용)", "cat": "기타 언급", "id": "2071710834527523030", "rep": 0}, {"d": "2026-06-29", "t": "23:39", "kind": "official", "type": "reset+banked", "ko": "사용량 소진 조사", "cat": "사용량 조사", "id": "2071740419030053227"}, {"d": "2026-07-01", "t": "20:02", "kind": "mention", "type": "mention", "ko": "AI 엔지니어 행사 부스 안내 (리셋 언급 포함)", "cat": "기타 언급", "id": "2072410623380468190", "rep": 0}, {"d": "2026-07-09", "t": "21:24", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2075330198887940337"}, {"d": "2026-07-10", "t": "05:30", "kind": "mention", "type": "mention", "ko": "GPT-5.6 Sol 출시 기념, 24시간 내 두 번 리셋 예고", "cat": "리셋 예고", "id": "2075452680760443190", "rep": 0}, {"d": "2026-07-10", "t": "17:59", "kind": "official", "type": "reset", "ko": "사유 미공개 (같은 날 추가 예정)", "cat": "미공개", "id": "2075641131002700120"}, {"d": "2026-07-11", "t": "05:54", "kind": "official", "type": "reset", "ko": "트래픽 급증", "cat": "장애·지연", "id": "2075820987833274448"}, {"d": "2026-07-11", "t": "14:51", "kind": "mention", "type": "mention", "ko": "리셋을 자동 적용한 두 가지 이유 설명 (웹/모바일 적립 리셋 미지원)", "cat": "리셋 안내", "id": "2075956058942820790", "rep": 1}, {"d": "2026-07-12", "t": "21:28", "kind": "official", "type": "banked", "ko": "적립 초기화, 사용자 50만 돌파", "cat": "사용자 수 돌파", "id": "2076418567143408112"}, {"d": "2026-07-13", "t": "18:29", "kind": "official", "type": "banked", "ko": "사용자 700만", "cat": "사용자 수 돌파", "id": "2076735790567338203"}, {"d": "2026-07-14", "t": "19:34", "kind": "official", "type": "reset", "ko": "사용자 800만", "cat": "사용자 수 돌파", "id": "2077114635308986427"}, {"d": "2026-07-15", "t": "02:01", "kind": "mention", "type": "mention", "ko": "리셋 발표가 아니라 피드백을 찾는 중이라는 농담", "cat": "농담·답글", "id": "2077212009071075330", "rep": 0}, {"d": "2026-07-15", "t": "05:59", "kind": "mention", "type": "mention", "ko": "9M 임박, 다시 리셋할지 여유를 줄지 질문", "cat": "기타 언급", "id": "2077271889626706300", "rep": 0}, {"d": "2026-07-16", "t": "04:14", "kind": "official", "type": "reset", "ko": "사용자 900만", "cat": "사용자 수 돌파", "id": "2077607697487188198"}, {"d": "2026-07-16", "t": "05:28", "kind": "mention", "type": "mention", "ko": "그들의 리셋 버튼을 훔쳤다는 농담", "cat": "농담·답글", "id": "2077626528020697173", "rep": 1}, {"d": "2026-07-18", "t": "03:28", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2078320950488297917"}, {"d": "2026-07-18", "t": "03:29", "kind": "mention", "type": "mention", "ko": "다른 곳의 속도 제한도 재설정했을지 모른다는 농담", "cat": "농담·답글", "id": "2078321266524881065", "rep": 1}, {"d": "2026-07-19", "t": "20:14", "kind": "mention", "type": "mention", "ko": "reset 이라는 단어에 필터가 있다는 농담", "cat": "농담·답글", "id": "2078936647518097638", "rep": 1}, {"d": "2026-07-20", "t": "04:19", "kind": "mention", "type": "mention", "ko": "리셋은 계속될 것이라는 답글", "cat": "농담·답글", "id": "2079058575440359695", "rep": 1}, {"d": "2026-07-21", "t": "16:47", "kind": "official", "type": "reset", "ko": "사용자 1,000만", "cat": "사용자 수 돌파", "id": "2079609157934886975"}, {"d": "2026-07-25", "t": "19:17", "kind": "official", "type": "reset", "ko": "밤사이 장애 후", "cat": "장애·지연", "id": "2081096447718723984"}, {"d": "2026-07-28", "t": "00:27", "kind": "mention", "type": "mention", "ko": "ChatGPT Work 빠른 채택 축하, 한도가 리셋된 기분", "cat": "기타 언급", "id": "2081899343091843463", "rep": 0}, {"d": "2026-07-28", "t": "03:09", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2081940052154933696"}, {"d": "2026-07-29", "t": "04:09", "kind": "official", "type": "reset", "ko": "GPT-5.6 Sol 한도 개편", "cat": "출시·기념", "id": "2082317452755751098"}, {"d": "2026-07-29", "t": "04:45", "kind": "mention", "type": "mention", "ko": "어느 날 리셋 버튼을 만들었고 그 후는 역사 (농담)", "cat": "농담·답글", "id": "2082326593532473523", "rep": 0}, {"d": "2026-07-30", "t": "07:58", "kind": "mention", "type": "mention", "ko": "리셋하고 가속한다, 출시 주간", "cat": "기타 언급", "id": "2082737638583501152", "rep": 1}, {"d": "2026-07-31", "t": "04:53", "kind": "mention", "type": "mention", "ko": "좋은 모델이 나오는 날의 징조 중 하나로 리셋 언급", "cat": "기타 언급", "id": "2083053369351090254", "rep": 0}, {"d": "2026-08-01", "t": "02:26", "kind": "mention", "type": "mention", "ko": "답글: 리셋 버튼이 보이지 않는다는 반응에 대한 응답", "cat": "농담·답글", "id": "2083378916203343920", "rep": 0}, {"d": "2026-08-01", "t": "03:32", "kind": "official", "type": "reset", "ko": "효율 개선 주간", "cat": "출시·기념", "id": "2083395449814229287"}, {"d": "2026-08-06", "t": "04:28", "kind": "mention", "type": "mention", "ko": "평균 6분마다 리셋을 요청하는 DM/이메일을 받는다는 통계", "cat": "기타 언급", "id": "2085221386713198988", "rep": 0}, {"d": "2026-08-07", "t": "21:46", "kind": "mention", "type": "mention", "ko": "테오가 리셋이 필요한 것 같다 (인용)", "cat": "기타 언급", "id": "2085845171363791135", "rep": 0}, {"d": "2026-08-08", "t": "20:29", "kind": "official", "type": "reset", "ko": "GPT-5.6 Sol 기념", "cat": "출시·기념", "id": "2086188036493344823"}, {"d": "2026-08-08", "t": "20:34", "kind": "mention", "type": "mention", "ko": "월요일에 또 하나의 연출된 리셋 예고", "cat": "리셋 예고", "id": "2086189414292865249", "rep": 1}, {"d": "2026-08-10", "t": "13:03", "kind": "mention", "type": "mention", "ko": "다른 리셋과 같지만 춤을 춘다 상상해 보라는 농담", "cat": "농담·답글", "id": "2086800639120888014", "rep": 1}, {"d": "2026-08-11", "t": "00:27", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2086972802457063486"}, {"d": "2026-08-11", "t": "00:28", "kind": "mention", "type": "mention", "ko": "유료 Work/Codex 사용자 전원 한도 재설정 (월요일 인사)", "cat": "리셋 안내", "id": "2086972933566857393", "rep": 0}, {"d": "2026-08-12", "t": "06:20", "kind": "mention", "type": "mention", "ko": "100만 명마다 리셋 약속, 1천만 이후 조용했다, 내일 리셋 예고", "cat": "리셋 예고", "id": "2087423996115681767", "rep": 0}, {"d": "2026-08-12", "t": "07:18", "kind": "mention", "type": "mention", "ko": "왜 Codex로 전환했나? 리셋이라고 말하지 말라는 질문", "cat": "기타 언급", "id": "2087438544323420273", "rep": 0}, {"d": "2026-08-13", "t": "01:01", "kind": "official", "type": "reset", "ko": "사용자 1,500만", "cat": "사용자 수 돌파", "id": "2087706104814023111"}, {"d": "2026-08-15", "t": "23:01", "kind": "mention", "type": "mention", "ko": "정기적인 리셋 없이도 구독 사용량이 훌륭하다는 답글", "cat": "농담·답글", "id": "2088763063495450791", "rep": 1}, {"d": "2026-08-17", "t": "00:36", "kind": "mention", "type": "mention", "ko": "Codex: 거의 100% 신뢰, 가끔 재설정 발생, 오픈소스", "cat": "리셋 안내", "id": "2089149255382438340", "rep": 0}, {"d": "2026-08-19", "t": "05:03", "kind": "mention", "type": "mention", "ko": "멋진 새 리셋 버튼을 선물받았다는 농담", "cat": "농담·답글", "id": "2089941380336644295", "rep": 0}, {"d": "2026-08-19", "t": "16:41", "kind": "mention", "type": "mention", "ko": "리셋 버튼을 부술 거야? (농담)", "cat": "농담·답글", "id": "2090117067584491653", "rep": 1}, {"d": "2026-08-21", "t": "11:43", "kind": "official", "type": "banked", "ko": "사용자 2,000만", "cat": "사용자 수 돌파", "id": "2090766694897619318"}, {"d": "2026-08-21", "t": "23:40", "kind": "mention", "type": "mention", "ko": "적립 리셋은 오후 8시 PST까지 완료 예정", "cat": "리셋 안내", "id": "2090947196107764189", "rep": 0}, {"d": "2026-08-22", "t": "00:50", "kind": "mention", "type": "mention", "ko": "적립 리셋 착륙 완료 안내", "cat": "리셋 안내", "id": "2090964822422949999", "rep": 0}, {"d": "2026-08-23", "t": "06:29", "kind": "mention", "type": "mention", "ko": "리셋은 내일 오후 2시경 PST 착륙 예정", "cat": "리셋 안내", "id": "2091412393368945027", "rep": 0}, {"d": "2026-08-24", "t": "00:46", "kind": "official", "type": "reset", "ko": "사용량 수정 사항 반영", "cat": "사용량 조사", "id": "2091688655828246890"}, {"d": "2026-08-25", "t": "14:30", "kind": "official", "type": "reset", "ko": "미공지, 사용자가 발견 후 답글로 확인", "cat": "미공개", "id": "2092311059197808936"}, {"d": "2026-08-26", "t": "05:53", "kind": "mention", "type": "mention", "ko": "리셋된 거 말씀하시는 건가요? (답글)", "cat": "농담·답글", "id": "2092490655864127909", "rep": 1}, {"d": "2026-08-27", "t": "06:31", "kind": "mention", "type": "mention", "ko": "리셋 버튼을 누른 지 20년이 된 느낌 (농담)", "cat": "농담·답글", "id": "2092862554632826968", "rep": 0}, {"d": "2026-08-27", "t": "16:35", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2093014447833116908"}, {"d": "2026-08-29", "t": "04:07", "kind": "mention", "type": "mention", "ko": "리셋에는 적절한 때가 있다, 곧이지만 오늘은 아님", "cat": "기타 언급", "id": "2093551005711679557", "rep": 1}, {"d": "2026-08-29", "t": "20:43", "kind": "official", "type": "reset", "ko": "사용자 제보 후 사용량 수정", "cat": "사용량 조사", "id": "2093801758665715784"}, {"d": "2026-08-30", "t": "19:24", "kind": "mention", "type": "mention", "ko": "Codex·ChatGPT Work 초기화가 PST 오후 6시에 시작", "cat": "리셋 안내", "id": "2094144275957350900", "rep": 0}, {"d": "2026-08-31", "t": "02:29", "kind": "official", "type": "reset", "ko": "사용자 2,500만", "cat": "사용자 수 돌파", "id": "2094251180121854309"}, {"d": "2026-08-31", "t": "02:34", "kind": "mention", "type": "mention", "ko": "2,500만 활성 사용자 기념, 유료 구독 전체 사용량 재설정", "cat": "리셋 안내", "id": "2094252447271366730", "rep": 0}, {"d": "2026-09-03", "t": "04:37", "kind": "mention", "type": "mention", "ko": "Which Codex reset? (답글)", "cat": "농담·답글", "id": "2095370639892955269", "rep": 1}, {"d": "2026-09-03", "t": "23:12", "kind": "official", "type": "banked", "ko": "Astra 미접근자에게 하루 1회 적립", "cat": "출시·기념", "id": "2095651088502591861"}, {"d": "2026-09-04", "t": "20:57", "kind": "mention", "type": "mention", "ko": "Astra 미접근 사용자에게 적립 리셋 지급, 오후 8시 PST까지", "cat": "리셋 안내", "id": "2095979536043401428", "rep": 0}, {"d": "2026-09-05", "t": "00:39", "kind": "official", "type": "banked", "ko": "Astra 조기 롤아웃", "cat": "출시·기념", "id": "2096035437299237298"}, {"d": "2026-09-06", "t": "19:46", "kind": "mention", "type": "mention", "ko": "리셋 전후 얻는 사용량에 차이가 없다는 답글", "cat": "농담·답글", "id": "2096686370848989558", "rep": 1}, {"d": "2026-09-06", "t": "20:09", "kind": "mention", "type": "mention", "ko": "누가 리셋 안 된다고 하던가요 (답글)", "cat": "농담·답글", "id": "2096692394435752258", "rep": 1}, {"d": "2026-09-07", "t": "19:24", "kind": "mention", "type": "mention", "ko": "리셋 예고 대신 'Never gonna give you up' 장난", "cat": "리셋 예고", "id": "2097043464538264003", "rep": 0}, {"d": "2026-09-08", "t": "01:56", "kind": "official", "type": "reset", "ko": "Astra 주간", "cat": "출시·기념", "id": "2097174560412246215"}, {"d": "2026-09-08", "t": "04:07", "kind": "mention", "type": "mention", "ko": "일정은 없고 리셋만 있다는 답글", "cat": "농담·답글", "id": "2097175062566846501", "rep": 1}, {"d": "2026-09-08", "t": "04:41", "kind": "mention", "type": "mention", "ko": "중간에 사용량을 두 번 리셋한 걸 잊었다는 답글", "cat": "농담·답글", "id": "2097183639356489952", "rep": 1}, {"d": "2026-09-09", "t": "18:23", "kind": "mention", "type": "mention", "ko": "저장된 리셋이 완전히 적용되지 않은 문제, 하나 더 제공+사과", "cat": "장애·사용량 문제", "id": "2097752790177370535", "rep": 0}, {"d": "2026-09-11", "t": "06:39", "kind": "mention", "type": "mention", "ko": "우수한 서비스에는 가끔의 리셋이 포함된다는 답글", "cat": "농담·답글", "id": "2098300424520687965", "rep": 1}, {"d": "2026-09-12", "t": "03:20", "kind": "mention", "type": "mention", "ko": "Astra 사용자 대상 리셋과 품질 문제 수정 업데이트", "cat": "장애·사용량 문제", "id": "2098612714704891959", "rep": 0}, {"d": "2026-09-12", "t": "08:09", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2098685367058612394"}, {"d": "2026-09-22", "t": "04:31", "kind": "mention", "type": "mention", "ko": "화요일에 리셋을 약속했다 (예고)", "cat": "리셋 예고", "id": "2102254445082116335", "rep": 0}, {"d": "2026-09-22", "t": "18:23", "kind": "official", "type": "banked", "ko": "GPT-6 Sol·Luna 출시", "cat": "출시·기념", "id": "2102463847714247142"}, {"d": "2026-09-26", "t": "00:07", "kind": "mention", "type": "mention", "ko": "장애 복구, 모든 유료 사용자 사용 한도 재설정", "cat": "장애·사용량 문제", "id": "2103637477760311522", "rep": 0}, {"d": "2026-09-26", "t": "18:17", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2103911959544610829"}, {"d": "2026-09-26", "t": "21:41", "kind": "mention", "type": "mention", "ko": "다음 주에 더 많은 리셋이 온다는 답글", "cat": "농담·답글", "id": "2103963215885701493", "rep": 1}, {"d": "2026-10-01", "t": "14:51", "kind": "mention", "type": "mention", "ko": "주간 사용량이 사실상 무제한이라 리셋을 제대로 못 한다", "cat": "기타 언급", "id": "2105672058269212820", "rep": 0}, {"d": "2026-10-02", "t": "02:14", "kind": "mention", "type": "mention", "ko": "내일 오전 10시 PST 글로벌 리셋 예고 (GPT-6.1 Sol 사과)", "cat": "리셋 예고", "id": "2105843926221660585", "rep": 0}, {"d": "2026-10-02", "t": "21:18", "kind": "official", "type": "reset", "ko": "사전 공지된 전체 초기화", "cat": "이벤트·선물", "id": "2106131810921136451"}, {"d": "2026-10-03", "t": "04:01", "kind": "mention", "type": "mention", "ko": "Pro 500 초기화가 예상대로 안 됐다는 제보, 조사 후 보상", "cat": "사용량 조사", "id": "2106233145163141249", "rep": 0}, {"d": "2026-10-03", "t": "04:26", "kind": "mention", "type": "mention", "ko": "Pro 500 초기화 문제 모두 수정", "cat": "장애·사용량 문제", "id": "2106239435461579088", "rep": 0}, {"d": "2026-10-04", "t": "20:33", "kind": "mention", "type": "mention", "ko": "28일 스프린트: 매일 개선 하나 또는 완전 리셋 출시", "cat": "28일 스프린트", "id": "2106845241357824205", "rep": 0}, {"d": "2026-10-04", "t": "20:35", "kind": "mention", "type": "mention", "ko": "스프린트 도전장 인용 답글", "cat": "농담·답글", "id": "2106845738814849339", "rep": 1}, {"d": "2026-10-06", "t": "20:58", "kind": "mention", "type": "mention", "ko": "투표: 좋은 날 24% / 리셋 필요 76%", "cat": "투표·논의", "id": "2107576143285219799", "rep": 0}, {"d": "2026-10-06", "t": "21:03", "kind": "mention", "type": "mention", "ko": "저는 리셋을 주는 걸 좋아해요", "cat": "기타 언급", "id": "2107577536779870210", "rep": 1}, {"d": "2026-10-06", "t": "21:07", "kind": "mention", "type": "mention", "ko": "2일차: 네 가지 업데이트 또는 리셋, 아니면 둘 다", "cat": "28일 스프린트", "id": "2107578625419866469", "rep": 0}, {"d": "2026-10-06", "t": "22:32", "kind": "mention", "type": "mention", "ko": "투표 보정: 훌륭한 릴리스 19.9% / 리셋 필요 80.1%", "cat": "투표·논의", "id": "2107599996225007892", "rep": 0}, {"d": "2026-10-07", "t": "03:35", "kind": "official", "type": "reset", "ko": "커뮤니티 투표", "cat": "이벤트·선물", "id": "2107676072871600470"}, {"d": "2026-10-07", "t": "19:19", "kind": "official", "type": "banked", "ko": "챗에 GPT-6, 사용자 4,000만", "cat": "사용자 수 돌파", "id": "2107913674593644711"}, {"d": "2026-10-10", "t": "22:15", "kind": "mention", "type": "mention", "ko": "6일차 / 리셋", "cat": "28일 스프린트", "id": "2109045220411351517", "rep": 0}, {"d": "2026-10-10", "t": "22:16", "kind": "mention", "type": "mention", "ko": "EOD까지 전역 리셋", "cat": "28일 스프린트", "id": "2109045392684032299", "rep": 0}, {"d": "2026-10-11", "t": "01:13", "kind": "mention", "type": "mention", "ko": "완벽에 도달하는 날부터 리셋될 것 (6일차 인용)", "cat": "28일 스프린트", "id": "2109090080497508356", "rep": 0}, {"d": "2026-10-11", "t": "04:01", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2109132167112782291"}, {"d": "2026-10-13", "t": "01:03", "kind": "mention", "type": "mention", "ko": "8일차 / 리셋", "cat": "28일 스프린트", "id": "2109812216212099456", "rep": 0}, {"d": "2026-10-13", "t": "01:03", "kind": "mention", "type": "mention", "ko": "PST EOD까지 글로벌 리셋 착륙", "cat": "28일 스프린트", "id": "2109812360596865224", "rep": 0}, {"d": "2026-10-13", "t": "05:06", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2109873287853707513"}, {"d": "2026-10-15", "t": "04:55", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2110595484180214059"}, {"d": "2026-10-17", "t": "16:20", "kind": "mention", "type": "mention", "ko": "13일째 / 한도 리셋", "cat": "28일 스프린트", "id": "2111492673890824348", "rep": 0}, {"d": "2026-10-17", "t": "21:12", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2111566005684289735"}, {"d": "2026-10-18", "t": "20:34", "kind": "mention", "type": "mention", "ko": "사람들이 길거리에서 리셋을 요청해서 카드를 만들 것 (농담)", "cat": "농담·답글", "id": "2111918768733753664", "rep": 0}, {"d": "2026-10-20", "t": "06:33", "kind": "official", "type": "reset", "ko": "사유 미공개", "cat": "미공개", "id": "2112432076767289678"}], "profileTotal": 3372};
+const $=id=>document.getElementById(id);
+const label={reset:"초기화","reset+banked":"초기화+적립",banked:"적립",mention:"언급"};
+const byDay={};D.daily.forEach(([d,n])=>byDay[d]={n,ev:[]});
+D.events.forEach(e=>{(byDay[e.d]=byDay[e.d]||{n:0,ev:[]}).ev.push(e)});
+const off=D.events.filter(e=>e.kind==="official"),men=D.events.filter(e=>e.kind==="mention");
+const total=D.daily.reduce((a,x)=>a+x[1],0), rel=D.events.length;
+$("banner").innerHTML="<b>수집 범위 주의</b> · 게시물은 2025-08-17부터 전부, 답글은 2026-06-28 이후만 수집했습니다. 전체 "+D.profileTotal.toLocaleString()+"건 중 "+total.toLocaleString()+"건("+Math.round(total/D.profileTotal*100)+"%)이 집계에 들어 있습니다.";
+const kp=[[total.toLocaleString(),"수집한 전체 트윗"],[rel,"리셋 관련 트윗"],[off.length,"공식 리셋 트윗"],[men.length,"리셋 언급 트윗"],[(rel/total*100).toFixed(1)+"%","전체 중 리셋 관련 비율"],[new Set(D.events.map(e=>e.d)).size+"일","리셋 관련 트윗이 있는 날"]];
+$("kpis").innerHTML=kp.map(([v,l])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join("");
+const mon={};Object.entries(byDay).forEach(([d,o])=>{const m=d.slice(0,7);mon[m]=mon[m]||{n:0,r:0};mon[m].n+=o.n;mon[m].r+=o.ev.length});
+const keys=[];{let y=2025,m=8;while(y<2026||m<=10){keys.push(y+"-"+String(m).padStart(2,"0"));if(++m>12){m=1;y++}}}
+const W=560,H=210,L=32,B=26,T=10,bw=(W-L)/keys.length;
+const mx=Math.max(...keys.map(k=>mon[k]?mon[k].n:0)),ymax=Math.ceil(mx/100)*100,sy=v=>H-B-(v/ymax)*(H-B-T);
+let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="월별 전체 트윗과 리셋 관련 트윗 막대 차트">`;
+for(let v=0;v<=ymax;v+=100)s+=`<line x1="${L}" x2="${W}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--line)"/><text x="${L-4}" y="${sy(v)+3}" text-anchor="end">${v}</text>`;
+keys.forEach((k,i)=>{const o=mon[k]||{n:0,r:0},x=L+i*bw+bw*.18,w=bw*.64,other=o.n-o.r;
+ if(other>0)s+=`<rect x="${x}" y="${sy(o.n)}" width="${w}" height="${sy(o.r)-sy(o.n)}" fill="var(--line)"><title>${k} 전체 ${o.n}건</title></rect>`;
+ if(o.r>0)s+=`<rect x="${x}" y="${sy(o.r)}" width="${w}" height="${sy(0)-sy(o.r)}" fill="var(--reset)"><title>${k} 리셋 관련 ${o.r}건</title></rect>`;
+ if(o.n)s+=`<text x="${x+w/2}" y="${sy(o.n)-3}" text-anchor="middle" style="fill:var(--ink)">${o.n}</text>`;
+ s+=`<text x="${x+w/2}" y="${H-12}" text-anchor="middle">${k.slice(5)}</text>`;
+ if(k.endsWith("-01")||i===0)s+=`<text x="${x+w/2}" y="${H-1}" text-anchor="middle">${k.slice(2,4)}년</text>`});
+$("chart").innerHTML=s+"</svg>";
+const cc={};D.events.forEach(e=>cc[e.cat]=(cc[e.cat]||0)+1);
+const cats=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+$("cats").innerHTML=cats.map(([c,n])=>`<div class="cat"><span>${c}</span><div class="bar"><div style="width:${n/cats[0][1]*100}%"></div></div><span class="num">${n}</span></div>`).join("");
+const PER=5;let page=1;
+function render(keepPage){
+  if(keepPage!==true)page=1;
+  const kd=$("fkind").value,q=$("fq").value.trim().toLowerCase(),all=$("fall").checked;
+  let n=0,shownEv=0;
+  const days=Object.keys(byDay).sort().reverse();
+  const out=[];
+  days.forEach(d=>{const o=byDay[d];
+    let ev=o.ev.filter(e=>(!kd||e.kind===kd));
+    if(q)ev=ev.filter(e=>(d+" "+e.ko+" "+e.cat).toLowerCase().includes(q));
+    if(!ev.length&&(!all||kd||q))return;
+    const a=ev.filter(e=>e.kind==="official").length,b=ev.length-a,z=v=>v?v:`<span class="zero">0</span>`;
+    const html=evHtml(ev)||`<span class="zero">리셋 관련 트윗 없음</span>`;
+    const first=ev[0]?ev[0].ko:"";
+    out.push(`<tr class="day" data-d="${d}"><td class="num">${d}</td><td class="c num">${o.n}</td><td class="c num">${z(ev.length)}</td><td class="c num">${z(a)}</td><td class="c num">${z(b)}</td><td class="hint">${first}${ev.length>1?` 외 ${ev.length-1}건`:""}</td></tr><tr class="det" data-d="${d}" hidden><td colspan="6">${html}</td></tr>`);shownEv+=ev.length});
+  const pages=Math.max(1,Math.ceil(out.length/PER));if(page>pages)page=pages;
+  $("rows").innerHTML=out.slice((page-1)*PER,page*PER).join("")||`<tr><td colspan="6">조건에 맞는 트윗이 없습니다.</td></tr>`;
+  $("expall").textContent="모두 펼치기";
+  $("count").textContent=`${out.length}일, 리셋 관련 트윗 ${shownEv}건 (${page}/${pages} 페이지, 페이지당 ${PER}일)`;
+  let p=`<button type="button" data-p="${page-1}" ${page===1?"disabled":""} aria-label="이전 페이지">&lt;</button>`;
+  const near=[...new Set([1,pages,page-1,page,page+1])].filter(x=>x>=1&&x<=pages).sort((a,b)=>a-b);
+  near.forEach((x,i)=>{if(i&&x-near[i-1]>1)p+=`<span class="hint">…</span>`;p+=`<button type="button" data-p="${x}" ${x===page?'aria-current="page"':""}>${x}</button>`});
+  p+=`<button type="button" data-p="${page+1}" ${page===pages?"disabled":""} aria-label="다음 페이지">&gt;</button>`;
+  $("pager").innerHTML=p;
+}
+$("pager").addEventListener("click",e=>{const b=e.target.closest("button[data-p]");if(!b||b.disabled)return;page=+b.dataset.p;render(true);$("rows").scrollIntoView({block:"nearest"})});
+["fkind","fq","fall"].forEach(i=>$(i).addEventListener("input",render));render();
+$("rows").addEventListener("click",e=>{const tr=e.target.closest("tr.day");if(!tr)return;
+  const det=tr.nextElementSibling;det.hidden=!det.hidden;tr.classList.toggle("open",!det.hidden)});
+$("expall").addEventListener("click",()=>{const open=$("expall").textContent==="모두 펼치기";
+  document.querySelectorAll("#rows tr.day").forEach(tr=>{tr.nextElementSibling.hidden=!open;tr.classList.toggle("open",open)});
+  $("expall").textContent=open?"모두 접기":"모두 펼치기"});
+
+// 리셋 규칙 (공식 리셋 기준)
+{const ts=off.map(e=>Date.parse(e.d+"T"+e.t+":00Z")).sort((a,b)=>a-b);
+ $("rn").textContent=off.length;
+ const eras=[["2025년","2025-09-01","2026-01-01"],["2026년 1분기","2026-01-01","2026-04-01"],["2026년 2분기","2026-04-01","2026-07-01"],["2026년 3분기","2026-07-01","2026-10-01"],["2026년 10월","2026-10-01","2026-10-21"]];
+ $("era").innerHTML=eras.map(([l,a,b])=>{const A=Date.parse(a),B=Date.parse(b),n=ts.filter(t=>t>=A&&t<B).length,days=(B-Math.max(A,ts[0]))/864e5;
+   return `<tr><td>${l}</td><td class="c num">${n}</td><td class="c num">${n?(days/n).toFixed(1)+"일":"-"}</td></tr>`}).join("");
+ const g=ts.slice(1).map((t,i)=>(t-ts[i])/864e5).sort((a,b)=>a-b);
+ $("gapnote").textContent=`간격 중앙값 ${g[Math.floor(g.length/2)].toFixed(1)}일, 2일 이하 ${g.filter(x=>x<2).length}번, 7일 초과 ${g.filter(x=>x>7).length}번. 몰아서 하다가 한참 쉬는 식입니다.`;
+ const dw=[0,0,0,0,0,0,0];ts.forEach(t=>dw[new Date(t-7*36e5).getUTCDay()]++);
+ const mxd=Math.max(...dw);
+ $("dow").innerHTML=["일","월","화","수","목","금","토"].map((l,i)=>`<div class="dow-row"><span>${l}</span><div class="bar"><div style="width:${dw[i]/mxd*100}%"></div></div><span class="num">${dw[i]}</span></div>`).join("")}
+
+// 달력
+const months=Object.keys(mon).sort();let cur=months[months.length-1],selDay=null;
+$("calsel").innerHTML=months.map(m=>`<option value="${m}">${m.slice(0,4)}년 ${+m.slice(5)}월</option>`).join("");
+const maxR=Math.max(...Object.values(byDay).map(o=>o.ev.length));
+function drawCal(){
+  $("calsel").value=cur;$("caltitle").textContent=cur.slice(0,4)+"년 "+(+cur.slice(5))+"월 달력";
+  $("calprev").disabled=cur===months[0];$("calnext").disabled=cur===months[months.length-1];
+  const [y,m]=cur.split("-").map(Number),first=new Date(Date.UTC(y,m-1,1)).getUTCDay(),dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+  let h=["일","월","화","수","목","금","토"].map(x=>`<div class="dow">${x}</div>`).join("");
+  for(let i=0;i<first;i++)h+=`<div class="cell blank"></div>`;
+  for(let d=1;d<=dim;d++){const key=cur+"-"+String(d).padStart(2,"0"),o=byDay[key],r=o?o.ev.length:0,n=o?o.n:0;
+    h+=`<button type="button" class="cell ${r?"has":""} ${!n&&!r?"empty":""} ${selDay===key?"sel":""}" data-d="${key}" aria-label="${key} 전체 ${n}건 리셋 관련 ${r}건"><span class="dn">${d}</span><span class="tot">${n?n+"건":""}</span>${r?`<span class="rs">${r}</span>`:""}</button>`}
+  $("cal").innerHTML=h;
+  if(selDay&&selDay.startsWith(cur))showDay(selDay);else{selDay=null;$("caldetail").innerHTML=`<p class="hint">날짜를 선택하면 리셋 정보가 여기에 표시됩니다.</p>`}
+}
+function evHtml(ev){return ev.map(e=>`<div class="ev"><span class="t">${e.t}</span><span class="pill p-${e.kind==="mention"?"mention":e.type}">${label[e.kind==="mention"?"mention":e.type]}</span><span>${e.ko}</span>${e.id?`<a href="https://x.com/thsottiaux/status/${e.id}" target="_blank" rel="noopener">트윗 보기</a>`:""}</div>`).join("")}
+function showDay(k){const o=byDay[k]||{n:0,ev:[]};
+  $("caldetail").innerHTML=`<p><b class="num">${k}</b> · 전체 트윗 ${o.n}건 · 리셋 관련 ${o.ev.length}건</p>`+(evHtml(o.ev)||`<p class="hint">이 날은 리셋 관련 트윗이 없습니다.</p>`)}
+$("cal").addEventListener("click",e=>{const c=e.target.closest("button.cell");if(!c)return;selDay=c.dataset.d;drawCal()});
+$("calprev").addEventListener("click",()=>{cur=months[months.indexOf(cur)-1];drawCal()});
+$("calnext").addEventListener("click",()=>{cur=months[months.indexOf(cur)+1];drawCal()});
+$("calsel").addEventListener("input",e=>{cur=e.target.value;drawCal()});
+drawCal();
+</script>
